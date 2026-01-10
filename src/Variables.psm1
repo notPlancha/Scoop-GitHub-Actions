@@ -21,13 +21,20 @@ $EVENT_TYPE = $env:GITHUB_EVENT_NAME
 
 # user/repo format
 $REPOSITORY = $env:GITHUB_REPOSITORY
+# Github Action job name & run ID
+$JOB = $env:GITHUB_JOB
+$RUN_ID = $env:GITHUB_RUN_ID
 # Location of bucket
 $BUCKET_ROOT = $env:GITHUB_WORKSPACE
 # Binaries from scoop. No need to rely on bucket specific binaries
 $BINARIES_FOLDER = Join-Path $env:SCOOP_HOME 'bin'
+# Manifests JSON Schema and location
+$MANIFESTS_SCHEMA = Join-Path $env:SCOOP_HOME 'schema.json'
 $MANIFESTS_LOCATION = Join-Path $BUCKET_ROOT 'bucket'
 
 $DEFAULT_EMAIL = '41898282+github-actions[bot]@users.noreply.github.com'
 
-Export-ModuleMember -Variable EVENT, EVENT_TYPE, EVENT_RAW, REPOSITORY, BUCKET_ROOT, BINARIES_FOLDER, MANIFESTS_LOCATION, `
-    NON_ZERO, DEFAULT_EMAIL
+Export-ModuleMember -Variable EVENT, EVENT_RAW, EVENT_TYPE, `
+    REPOSITORY, JOB, RUN_ID, `
+    BUCKET_ROOT, BINARIES_FOLDER, `
+    MANIFESTS_SCHEMA, MANIFESTS_LOCATION, NON_ZERO, DEFAULT_EMAIL

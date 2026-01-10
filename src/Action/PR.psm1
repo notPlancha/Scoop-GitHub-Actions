@@ -98,7 +98,8 @@ function New-FinalMessage {
     $labelsToRemove = @()
     # Add some more human friendly message
     if ($env:NON_ZERO_EXIT) {
-        $message.Insert(0, '[Your changes do not pass checks.](https://github.com/ScoopInstaller/GithubActions/wiki/Pull-Request-Checks)')
+        $message.InsertRange(0, @('Your changes did not pass all [checks](https://github.com/ScoopInstaller/GithubActions/wiki/Pull-Request-Checks).', '',
+                                  'Please address the issues in the manifest and comment starting with `/verify` to rerun the checks.'))
         $labelsToAdd += 'manifest-fix-needed'
         $labelsToRemove += 'review-needed'
     } else {
@@ -107,12 +108,9 @@ function New-FinalMessage {
         $labelsToRemove += 'manifest-fix-needed'
     }
 
-    # TODO: Comment URL to action log
-    # Add-IntoArray $message "[_See log of all checks_](https://github.com/$REPOSITORY/runs/$RUN_ID)"
-
     Remove-Label -ID $prID -Label $labelsToRemove
     Add-Label -ID $prID -Label $labelsToAdd
-    Add-Comment -ID $prID -Message $message
+    Add-Comment -ID $prID -Message $message -AppendLogLink
 }
 
 function Test-PRFile {
@@ -128,11 +126,13 @@ function Test-PRFile {
 
     $check = @()
     $invalid = @()
+    $schema = Get-Content -Path $MANIFESTS_SCHEMA -Raw
     foreach ($f in $File) {
         Write-Log "Starting $($f.filename) checks"
 
         # Reset variables from previous iteration
         $manifest = $null
+        $content = $null
         $object = $null
         $statuses = [Ordered] @{ }
 
@@ -140,11 +140,11 @@ function Test-PRFile {
         $manifest = Get-ChildItem $BUCKET_ROOT $f.filename
         Write-Log 'Manifest' $manifest
 
-        # For Some reason -ErrorAction is not honored for convertfrom-json
-        $old_e = $ErrorActionPreference
-        $ErrorActionPreference = 'SilentlyContinue'
-        $object = Get-Content $manifest.Fullname -Raw | ConvertFrom-Json
-        $ErrorActionPreference = $old_e
+        # Try to parse the JSON
+        $content = Get-Content -Path $manifest.FullName -Raw
+        if (Test-Json -Json $content -Schema $schema -ErrorAction 'SilentlyContinue') {
+            $object = ConvertFrom-Json -InputObject $content -ErrorAction 'SilentlyContinue'
+        }
 
         if ($null -eq $object) {
             Write-Log 'Conversion failed'
@@ -154,13 +154,33 @@ function Test-PRFile {
 
             if ($manifest.Extension -eq '.json') {
                 Write-Log 'Invalid JSON'
-                $invalid += $manifest.Basename
+                $invalid += $manifest.BaseName
             } else {
                 Write-Log 'Not manifest at all'
             }
             Write-Log "Skipped $($f.filename)"
             continue
         }
+
+        #region Lint
+        Write-Log 'Lint'
+
+        try {
+            & (Join-Path $BINARIES_FOLDER 'formatjson.ps1') -App $manifest.Basename -Dir $MANIFESTS_LOCATION
+
+            $contentFormated = Get-Content -Path $manifest.FullName -Raw
+
+            $lint = $content -eq $contentFormated
+        } catch {
+            $lint = $false
+
+            Write-Log 'Lint Checks' @("Exception occurred: $($_.Exception.Message)", "$($_.ScriptStackTrace)")
+        }
+
+        $statuses.Add('Lint', $lint)
+
+        Write-Log 'Lint done'
+        #endregion
 
         #region 1. Property checks
         $statuses.Add('Description', ([bool] $object.description))
@@ -171,7 +191,13 @@ function Test-PRFile {
         #region 2. Hashes
         if ($object.version -ne 'nightly') {
             Write-Log 'Hashes'
-            $outputH = @(& (Join-Path $BINARIES_FOLDER 'checkhashes.ps1') -App $manifest.Basename -Dir $MANIFESTS_LOCATION *>&1)
+
+            try {
+                $outputH = @(& (Join-Path $BINARIES_FOLDER 'checkhashes.ps1') -App $manifest.Basename -Dir $MANIFESTS_LOCATION *>&1)
+            } catch {
+                $outputH = @("Exception occurred: $($_.Exception.Message)", "$($_.ScriptStackTrace)")
+            }
+
             Write-Log 'Output' $outputH
 
             # Everything should be all right when latest string in array will be OK

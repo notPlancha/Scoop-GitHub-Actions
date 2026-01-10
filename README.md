@@ -25,10 +25,6 @@ Set of automated actions, which bucket maintainers can use to save time managing
 1. `SPECIAL_SNOWFLAKES`
     - String
     - List of manifest names joined with `,` used as parameter for auto-pr utility.
-1. `FORCE_PWSH`
-    - String. Use `'1'` or `'0'`
-    - If enabled, `pwsh` (PowerShell Core) will be used instead of `powershell` (Windows PowerShell).
-    - Use `powershell` by default. More: [#38](https://github.com/ScoopInstaller/GithubActions/pull/38) [#39](https://github.com/ScoopInstaller/GithubActions/pull/39) [#46](https://github.com/ScoopInstaller/GithubActions/pull/46)
 
 ## Available actions
 
@@ -74,12 +70,18 @@ It could be one of these:
             1. Labels `manifest-fix-needed`, `verified`, `help wanted` are added
         1. All URLs could be downloaded without problem
             1. Possible causes are attached in comment
+- **Decompression/Extraction error**
+    1. Comment to issue is posted
+        1. If one or more specific extraction tool names (7zip|msi|innounp|dark) are mentioned in the issue description
+            1. Only related extraction help tips will be added in comment
+        1. None of the specific extraction tool names are mentioned in the issue description
+            1. All extraction help tips will be added in comment
 
 ### Pull Requests
 
-As soon as a PR **is created** or the **comment `/verify` is posted** to it, validation tests are executed (see [wiki](https://github.com/ScoopInstaller/GithubActions/wiki/Pull-Request-Checks)) for detailed desciption):
+As soon as a PR **is created** or a **comment starting with `/verify` is posted** to it, validation tests are executed (see [wiki](https://github.com/ScoopInstaller/GithubActions/wiki/Pull-Request-Checks) for detailed description):
 
-#### Overview of validatiors
+#### Overview of validators
 
 1. JSON standard format check
 1. Required properties (`License`, `Description`) are in place
@@ -113,7 +115,6 @@ jobs:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         SKIP_UPDATED: '1'
         THROW_ERROR: '0'
-        FORCE_PWSH: '0'
 
 #.github\workflows\issues.yml
 on:
